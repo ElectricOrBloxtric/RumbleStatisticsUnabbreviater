@@ -1,0 +1,125 @@
+// ==UserScript==
+// @name         Rumble Statistic Unabbreviater
+// @description  Displays the unabbreviated statistics for Rumble channels and videos.
+// @match        https://*.rumble.com/*
+// @match        https://*.rumble.com/c/*
+// @match        https://*.rumble.com/user/*
+// @version      1
+// @grant        GM_xmlhttpRequest
+// ==/UserScript==
+
+async function checkUrl() {
+  const rumbleVideoRegex = /^https?:\/\/rumble\.com\/.*\.html$/i;
+  const match1 = rumbleVideoRegex.test(window.location.href);
+  if (match1) {
+    updateVideoStatistics(window.location.href);
+    setInterval(() => {
+      updateVideoStatistics(window.location.href);
+    }, 2500);
+    return;
+  }
+
+  const rumbleUserRegex = /^https?:\/\/rumble\.com\/(?:(user|c)\/)?(.+)$/i;
+  const match2 = rumbleUserRegex.exec(window.location.href);
+  if (!match2) {
+    return;
+  }
+
+  const endpoint = match2[1] === "c" ? "channel" : "user";
+  const endOfUrl = match2[2];
+  updateChannelStatistics(endpoint, endOfUrl);
+
+  setInterval(() => {
+    updateChannelStatistics(endpoint, endOfUrl);
+  }, 2500);
+}
+
+window.addEventListener("load", checkUrl);
+
+async function updateVideoStatistics(url) {
+  const urlPath = url.split("https://rumble.com/")[1].split(".html")[0];
+  fetch(`https://rumble.com/service.php?name=media.details&url=${urlPath}`)
+    .then((response) => response.json())
+    .then((json) => {
+      const viewCount = json.data.views || 0;
+      const followerCount = json.data.by?.followers || 0;
+      const likeCount = json.data.rumble_votes.num_votes_up || 0;
+      const dislikeCount = json.data.rumble_votes.num_votes_down || 0;
+      const commentCount = json.data.comments || 0;
+      const viewsSpan = document.querySelector(".video-item--views");
+      const commentsTopSpan = document.querySelector(".video-item--comments");
+      const followersSpan = document.querySelector(".media-heading-num-followers");
+      const ratingSpan = document.querySelector(".rating-bar");
+      const commentsSpan = document.querySelector(".comment-count");
+
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "video-counters--icon");
+      svg.setAttribute("width", "15");
+      svg.setAttribute("height", "11");
+      svg.setAttribute("viewBox", "0 0 15 11");
+
+      const path1 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path1.setAttribute("fill", "none");
+      path1.setAttribute(
+        "d",
+        "M1.4 5.7s2.3-4.5 6.3-4.5S14 5.7 14 5.7s-2.3 4.6-6.3 4.6-6.3-4.6-6.3-4.6Z"
+      );
+      path1.setAttribute("stroke-width", "1.4");
+      path1.setAttribute("stroke-linecap", "round");
+      path1.setAttribute("stroke-linejoin", "round");
+      path1.setAttribute("stroke", "currentColor");
+
+      const path2 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path2.setAttribute("d", "M7.7 7.6a1.8 1.8 0 1 0 0-3.7 1.8 1.8 0 0 0 0 3.7Z");
+      path2.setAttribute("fill", "currentColor");
+
+      const svg2 = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg2.setAttribute("class", "video-counters--icon");
+      svg2.setAttribute("width", "14");
+      svg2.setAttribute("height", "14");
+      svg2.setAttribute("viewBox", "0 0 14 14");
+
+      const path3 = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path3.setAttribute("fill", "none");
+      path3.setAttribute(
+        "d",
+        "M12.7 9.2a1.3 1.3 0 0 1-1.3 1.3H3.6L.9 13V2.6a1.3 1.3 0 0 1 1.3-1.3h9.2a1.3 1.3 0 0 1 1.3 1.3v6.6Z"
+      );
+      path3.setAttribute("stroke-width", "1.4");
+      path3.setAttribute("stroke-linecap", "round");
+      path3.setAttribute("stroke-linejoin", "round");
+      path3.setAttribute("stroke", "currentColor");
+
+      svg.appendChild(path1);
+      svg.appendChild(path2);
+      svg2.appendChild(path3);
+
+      viewsSpan.innerHTML = "";
+      commentsTopSpan.innerHTML = "";
+      viewsSpan.appendChild(svg);
+      commentsTopSpan.appendChild(svg2);
+      viewsSpan.appendChild(document.createTextNode(viewCount.toLocaleString()));
+      commentsTopSpan.appendChild(
+        document.createTextNode(commentCount.toLocaleString())
+      );
+      followersSpan.textContent = `${followerCount.toLocaleString()} followers`;
+      ratingSpan.title = `${likeCount.toLocaleString()} Likes | ${dislikeCount.toLocaleString()} Dislikes`;
+      commentsSpan.textContent = `${commentCount.toLocaleString()} Comments`;
+    })
+    .catch((error) => {
+      console.error("Error fetching statistics:", error);
+    });
+}
+
+async function updateChannelStatistics(endpoint, endOfUrl) {
+  fetch(`https://rumble.com/service.php?name=media.details&url=${endOfUrl}`)
+    .then((response) => response.json())
+    .then((json) => {
+      const followerCount = json.data.by?.followers || 0;
+      const followersSpan = document.querySelector("body > main > div > div.channel-header--content > div > div > div.channel-header--title > span > span");
+      followersSpan.textContent = `${followerCount.toLocaleString()} Followers`;
+    })
+    .catch((error) => {
+      console.error(`Error fetching ${endpoint} follower count:`, error);
+    });
+}
